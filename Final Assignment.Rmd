@@ -1,0 +1,1246 @@
+---
+title: "Final Assignment"
+output:
+  html_document:
+    fig_width: 8
+    fig_height: 8
+  pdf_document: default
+date: "2024-01-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+options(Encoding="UTF-8")
+options(scipen = 999)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# Set working directory
+setwd("G:/我的雲端硬碟/lse/Course Materials/MY472/practice/assignments/Final")
+# Required packages in this exercise
+library(tidyverse)
+library(rvest)
+library(spotifyr)
+library(geniusr)
+library(rvest)
+library(xml2)
+library(ggplot2)
+library(lubridate)
+library(ggpubr)
+library(ggrepel)
+library(quanteda)
+
+```
+
+The link to the repo: https://github.com/JaydenLin1207/MY472-FINAL.git
+
+# Analysing the Everlasting Popularity of Rolling Stone’s 100 Greatest Musical Artists
+
+## Introduction
+This study investigates the enduring popularity of the 100 greatest musical artists listed in [Rolling Stone Magazine's 2010 ranking](https://www.rollingstone.com/music/music-lists/100-greatest-artists-147446/). The primary goals are to determine whether these artists and their works continue to hold prominence in 2023 and to identify characteristics in their music that correlate with enduring popularity.
+
+The study utilises the Spotify API to collect essential data and the Genius API to obtain the lyrics. The research focuses on comparing the popularity of the 100 greatest artists with that of their related artists and establishing the relationship between song popularity and audio features. Text analysis, including sentiment analysis, is also employed to explore the connection between popularity and song lyrics.
+
+## Data
+
+```{r, eval=FALSE, echo= FALSE, warning=FALSE}
+# # Perform web-scraping to get a list of Rolling Stone’s 100 Greatest Artists
+# Sys.setlocale("LC_ALL","English")
+# 
+# url_100_50 <- "https://www.rollingstone.com/music/music-lists/100-greatest-artists-147446/"
+# artists_100_50 <- read_html(url_100_50) %>%
+#   html_elements( css = 'h2') %>% 
+#   html_text() %>%
+#   head(50)
+# 
+# url_50_1 <- "https://www.rollingstone.com/music/music-lists/100-greatest-artists-147446/the-band-2-88489/"
+# 
+# artists_50_1 <- read_html(url_50_1) %>%
+#   html_elements( css = 'h2') %>% 
+#   html_text() %>%
+#   head(50)
+# 
+# artists <- rev(c(artists_100_50, artists_50_1))
+# 
+# write_rds(artists, "artists.rds")
+
+```
+
+
+```{r, eval=FALSE, echo= FALSE}
+# # Get audio feature information for all the artists
+# readRenviron("api_keys.Renviron")
+# SPOTIFY_CLIENT_ID <- Sys.getenv("SPOTIFY_CLIENT_ID")
+# SPOTIFY_CLIENT_SECRET <- Sys.getenv("SPOTIFY_CLIENT_SECRET")
+# access_token <- get_spotify_access_token()
+# 
+# audio_info <- data.frame(matrix(ncol = 0, nrow = 0), stringsAsFactors = FALSE)
+# 
+# for (artist in artists) {
+#   tryCatch({
+#     audio_artist <- get_artist_audio_features(artist)
+#     audio_info <- rbind(audio_info, audio_artist)
+#   }, error = function(e) {
+#     # No albums found with some artist_id
+#     # Print the name of the artist and the error message
+#     cat("Error for artist:", artist, "\n")
+#     cat("Error message:", conditionMessage(e), "\n")
+#   })
+# }
+# 
+# # Save the data
+# write.csv(audio_info, "audio_info.csv", row.names = FALSE, fileEncoding = "UTF-8")
+
+```
+
+```{r, eval=FALSE, echo= FALSE}
+# artists_id <- unique(audio_info$artist_id)
+# 
+# # Get popularity of 100 greatest artists
+# artists_1 <- get_artists(artists_id[1:50])
+# artists_2 <- get_artists(artists_id[51:98])
+# artists_info <- rbind(artists_1, artists_2)
+# 
+# artists_info[,c(1,3,4) ] <- lapply(artists_info[, c(1,3,4)], as.character)
+# write.csv(artists_info, "artists_info.csv", row.names = FALSE, fileEncoding = "UTF-8")
+
+```
+
+```{r, eval=FALSE, echo= FALSE}
+# # Get popularity of every album
+# album_ids <- unique(audio_info$album_id)
+# album_num <- length(album_ids)
+# 
+# album_info <- data.frame(matrix(ncol = 0, nrow = 0), stringsAsFactors = FALSE)
+# 
+# # Request data of 20 albums every time because of
+# # the limit of get_albums function
+# for (i in seq(1, album_num, by = 20)) {
+#   end <- min(i + 19, album_num)
+#   album_info_element <- get_albums(album_ids[i:end])
+#   album_info<-rbind(album_info,album_info_element)
+# }
+# 
+# # Save the data
+# album_info[, c(2, 3, 4, 5, 8, 20)] <- lapply(album_info[, c(2, 3, 4, 5, 8, 20)], as.character)
+# write.csv(album_info, "album_info.csv", row.names = FALSE, fileEncoding = "UTF-8")
+
+```
+
+```{r, eval=FALSE, echo= FALSE}
+# # Get the popularity of every track
+# track_ids <- unique(audio_info$track_id)
+# track_num <- length(track_ids)
+# test <- get_tracks(track_ids)
+# 
+# track_info <- data.frame(matrix(ncol = 0, nrow = 0), stringsAsFactors = FALSE)
+# 
+# # Request 50 tracks every request to fulfil the limit of the API
+# for (i in seq(1, track_num, by = 50)) {
+#   end <- min(i + 49, track_num)
+#   track_info_element <- get_tracks(track_ids[i:end])
+#   track_info<-rbind(track_info, track_info_element)
+# }
+# 
+# track_info[, c(1, 2, 16, 17, 20)] <- lapply(track_info[, c(1, 2, 16, 17, 20)], as.character)
+# write.csv(track_info, "track_info.csv", row.names = FALSE, fileEncoding = "UTF-8")
+
+
+```
+
+```{r, eval=FALSE, echo= FALSE}
+# 
+# album_info_popu <- album_info %>%
+#   select(id, popularity) %>%
+#   rename(album_popularity = popularity)
+# 
+# track_info_popu <- track_info %>%
+#   select(id, popularity)%>%
+#   rename(track_popularity = popularity)
+# 
+# artists_info <- artists_info %>%
+#   select(1,3,6,11)%>%
+#   rename(artist_genre = genres, artist_id = id, artist_popularity = popularity, artist_followers = followers.total)
+# 
+# 
+# # Combine all data
+# all_info_100 <- audio_info %>%
+#   left_join(album_info_popu, by = c("album_id" = "id")) %>%
+#   left_join(track_info_popu, by = c("track_id" = "id")) %>%
+#   left_join(artists_info, by = c("artist_id" = "artist_id")) %>%
+#   mutate(album_release_date = as.Date(album_release_date))
+# 
+# write.csv(all_info_100, "all_info_100.csv", row.names = FALSE, fileEncoding = "UTF-8")
+
+```
+
+```{r, eval=FALSE, echo= FALSE}
+# 
+# # Get related artists for the 100 greatest artists
+# related_artists <- data.frame(matrix(ncol = 0, nrow = 0), stringsAsFactors = FALSE)
+# for (id in artists_id){
+#   related_artists_element <- get_related_artists(id)
+#   related_artists<-rbind(related_artists, related_artists_element)
+# }
+# related_artists[,c(1,3,4) ] <- lapply(related_artists[, c(1,3,4)], as.character)
+# write.csv(related_artists, "related_artists.csv", row.names = FALSE, fileEncoding = "UTF-8")
+# 
+# # Filter out the artists that are in the 100 greatest artists
+# related_artists_unique <- unique(related_artists) %>%
+#   filter(! id %in% unique(all_info_100$artist_id)) %>%
+#   select(1,3,6,11)%>%
+#   rename(artist_genre = genres, artist_id = id, artist_popularity = popularity, artist_followers = followers.total)
+
+
+```
+
+```{r, eval=FALSE, echo= FALSE}
+
+# # Get audio feature information for related artists
+# related_audio_info <- data.frame(matrix(ncol = 0, nrow = 0), stringsAsFactors = FALSE)
+# 
+# for (artist in related_artists_unique$id) {
+#   tryCatch({
+#     related_audio_info_element <- get_artist_audio_features(artist)
+#     related_audio_info <- rbind(related_audio_info, related_audio_info_element)
+#   }, error = function(e) {
+#     # There are no albums found with some artist_id
+#     # Print the name of the artist and the error message
+#     cat("Error for artist:", artist, "\n")
+#     cat("Error message:", conditionMessage(e), "\n")
+#   })
+# }
+# 
+# related_audio_info[, c (4, 5, 23, 24)] <- lapply(related_audio_info[, c(4, 5, 23, 24 )], as.character)
+# write.csv(related_audio_info, "related_audio_info.csv", row.names = FALSE, fileEncoding = "UTF-8")
+
+```
+
+
+```{r, eval=FALSE, echo= FALSE}
+# ## Get popularity of related artists albums
+# related_album_ids <- unique(related_audio_info$album_id)
+# related_album_num <- length(related_album_ids)
+# related_album_info <- data.frame(matrix(ncol = 0, nrow = 0), stringsAsFactors = FALSE)
+# 
+# # Request 20 albums every time because of
+# # the limit of get_albums function
+# for (i in seq(1, related_album_num, by = 20)) {
+#   end <- min(i + 19, related_album_num)
+#   related_album_info_element <- get_albums(related_album_ids[i:end])
+#   related_album_info<-rbind(related_album_info,related_album_info_element)
+# }
+# 
+# # Save the data
+# related_album_info[, c(2, 3, 4, 5, 8, 20)] <- lapply(related_album_info[, c(2, 3, 4, 5, 8, 20)], as.character)
+# write.csv(related_album_info, "related_album_info.csv", row.names = FALSE, fileEncoding = "UTF-8")
+
+
+```
+
+```{r, eval=FALSE, echo= FALSE}
+# # Get popularity of related artists tracks
+# related_track_ids <- unique(related_audio_info$track_id)
+# related_track_num <- length(related_track_ids)
+# 
+# related_track_info <- data.frame(matrix(ncol = 0, nrow = 0), stringsAsFactors = FALSE)
+# # Request 50 tracks every request to save memory and fulfil the limit of the API
+# for (i in seq(35600, related_track_num, by = 50)) {
+#   end <- min(i + 49, related_track_num)
+#   related_track_info_element <- get_tracks(related_track_ids[i:end])
+#   related_track_info <- rbind(related_track_info, related_track_info_element)
+# }
+# 
+# related_track_info[, c(1, 2, 16, 17, 20)] <- lapply(related_track_info[, c(1, 2, 16, 17, 20)], as.character)
+# write.csv(related_track_info, "related_track_info.csv", row.names = FALSE, fileEncoding = "UTF-8")
+
+
+```
+
+```{r, eval=FALSE, echo= FALSE}
+
+# related_album_info_popu <- related_album_info %>%
+#   select(id, popularity)%>%
+#   rename(album_popularity = popularity)
+# 
+# related_track_info_popu <- related_track_info %>%
+#   select(id, popularity)%>%
+#   rename(track_popularity = popularity)
+# 
+# 
+# all_info_related <- related_audio_info %>%
+#   left_join(related_album_info_popu, by = c("album_id" = "id")) %>%
+#   left_join(related_track_info_popu, by = c("track_id" = "id")) %>%
+#   left_join(related_artists_unique, by = c("artist_id" = "artist_id")) %>%
+#   mutate(album_release_date = as.Date(album_release_date))
+# 
+# write.csv(all_info_related, "all_info_related.csv", row.names = FALSE, fileEncoding = "UTF-8")
+
+```
+
+```{r, echo= FALSE}
+all_info_100 <- read.csv("all_info_100.csv")
+all_info_related <- read.csv("all_info_related.csv")
+```
+
+```{r, echo= TRUE}
+glimpse(all_info_100)
+```
+
+
+```{r, echo = TRUE}
+dim(all_info_related)
+```
+
+The Spotify API was utilised to gather followers, popularity, and [audio features](https://developer.spotify.com/documentation/web-api/reference/get-audio-features) of the 100 greatest artists and their [related artists]( https://developer.spotify.com/documentation/web-api/reference/get-an-artists-related-artists). [Popularity](https://developer.spotify.com/documentation/web-api/reference/get-track). is an crucial index to evaluate artists' popularity at the end of 2023.
+
+The final dataset for the 100 greatest artists comprises 61,843 rows and 45 columns, each row represent one track. For 654 related artists, the dataset contains 228,544 rows with the same 45 columns.
+
+```{r, eval=FALSE, echo= FALSE}
+# Fix issues of geniusr package
+get_lyrics <- function (session) {
+  lyrics <-  session %>% html_nodes(xpath = '//div[contains(@class, "Lyrics__Container")]')
+  song <-  session %>% html_nodes(xpath = '//span[contains(@class, "SongHeaderdesktop__")]') %>% html_text(trim = TRUE) 
+  artist <-  session %>% html_nodes(xpath = '//a[contains(@class, "SongHeaderdesktop__Artist")]') %>% html_text(trim = TRUE)
+  
+  xml_find_all(lyrics, ".//br") %>% xml_add_sibling("p", "\n")
+  xml_find_all(lyrics, ".//br") %>% xml_remove()
+  lyrics <- html_text(lyrics, trim = TRUE)
+  lyrics <- unlist(strsplit(lyrics, split = "\n"))
+  lyrics <- grep(pattern = "[[:alnum:]]", lyrics, value = TRUE)
+  if (is_empty(lyrics)) {
+    return(tibble(line = NA, section_name = NA, section_artist = NA, 
+                  song_name = song, artist_name = artist))
+  }
+  section_tags <- nchar(gsub(pattern = "\\[.*\\]", "", lyrics)) == 0
+  sections <- geniusr:::repeat_before(lyrics, section_tags)
+  sections <- gsub("\\[|\\]", "", sections)
+  sections <- strsplit(sections, split = ": ", fixed = TRUE)
+  section_name <- sapply(sections, "[", 1)
+  section_artist <- sapply(sections, "[", 2)
+  tibble(line = lyrics[!section_tags], section_name = section_name[!section_tags], 
+         artist = section_artist[!section_tags], song_name = song)
+}
+
+assignInNamespace("get_lyrics", get_lyrics, "geniusr")
+```
+
+
+
+```{r, eval=FALSE, echo= FALSE}
+# # Get lyrics of 100 greatest singers' songs
+# all_info_100_lyrics <- all_info_100 %>%
+#   select(track_id, track_name, artist_name) 
+# all_info_100_lyrics$lyric <- ""
+# all_info_100_lyrics$artist_name_check <- ""
+# 
+# for (i in 1:nrow(all_info_100_lyrics)) {
+#   track <- all_info_100_lyrics$track_name[i]
+#   artist <- all_info_100_lyrics$artist_name[i]
+#   tryCatch({
+#   result <- get_lyrics_search(artist, track)
+#   all_info_100_lyrics$lyric[i] <- result %>%
+#     mutate(lyric = paste(line, collapse = " ")) %>%
+#     select(lyric) %>%
+#     unique()
+#   all_info_100_lyrics$artist_name_check[i] <- result$artist[1]
+#   if (i %% 100 == 0) {
+#     print(i)
+#   }
+#   }, error = function(e) {
+#     # Print the name of track, the artist and the error message
+#     # cat("Error for artist and track:", artist, track,"\n")
+#     # cat("Error message:", conditionMessage(e), "\n")
+#   })
+# }
+# 
+# all_info_100_lyrics.csv$lyric <- as.character(all_info_100_lyrics.csv$lyric)
+# 
+# write.csv(all_info_100_lyrics, "all_info_100_lyrics.csv", row.names = FALSE, fileEncoding = "UTF-8")
+
+
+```
+
+
+```{r}
+all_info_100_lyrics <- read.csv("all_info_100_lyrics.csv", fileEncoding = "UTF-8") %>%
+  select(1:4)
+```
+
+```{r, echo= TRUE}
+glimpse(all_info_100_lyrics)
+
+```
+
+Lyrics for 25,262 available songs by the 100 greatest artists were retrieved from the Genius API.
+
+## Analysis
+### Popularity and followers
+
+```{r, echo= FALSE, warning=FALSE}
+all_info_100 <- all_info_100 %>%
+  mutate(artist_type = "Greatest 100") 
+
+all_info_related <- all_info_related %>%
+  mutate(artist_type = "Related artists")
+
+all_info_compare <- rbind(all_info_100, all_info_related)
+
+artists_compare <- all_info_compare %>%
+  group_by(artist_type) %>%
+  # Remove outliers to better visualize the data
+  filter(artist_followers > quantile(artist_followers, 0.1),
+         artist_followers < quantile(artist_followers, 0.9),
+         artist_popularity > quantile(artist_popularity, 0.1),
+         artist_popularity < quantile(artist_popularity, 0.9))
+
+# Create the dot plot
+ggplot(artists_compare, aes(x = artist_followers, y = artist_popularity, color = artist_type, fill = artist_type)) +
+  geom_point() +
+  stat_chull(aes(color = artist_type, fill = artist_type), 
+             alpha = 0.1, geom = "polygon") +
+  labs(title = "Comparing the Number of Follower and Popularity",
+       subtitle = "Rolling Stone’s 100 Greatest Artists vs Related Artists",
+       x = "Follower",
+       y = "Popularity",
+       color = "Type",
+       fill = "Type") +
+  theme_minimal() +
+  theme(legend.title=element_blank()) +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+```
+
+The plot demonstrates that a majority of the 100 greatest artists exhibit higher popularity and possess more followers compared to their related artists.
+
+```{r,echo= FALSE}
+
+# Comparing the popularity of tracks by release date of artists
+all_info_compare %>% 
+  select(track_id, album_release_year, track_popularity, artist_type) %>%
+  unique() %>%
+  filter( album_release_year >1950,
+          !is.na(track_popularity)) %>%
+  group_by(artist_type) %>%
+  filter(track_popularity > quantile(track_popularity, 0.1),
+         track_popularity < quantile(track_popularity, 0.9)) %>%
+  ggplot(aes(x = album_release_year, y = track_popularity, color = artist_type, fill = artist_type)) +
+  stat_summary(fun.y = mean, geom = "line", size = 1) +
+  labs(title = "Comparing Popularity of Tracks by Release Date",
+       subtitle = "Rolling Stone’s 100 Greatest Artists vs Related Artists",
+       x = "Year",
+       y = "Popularity",
+       color = "Type",
+       fill = "Type") +
+  theme_minimal() +
+  theme(legend.title=element_blank()) +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+```
+
+
+The plot clearly reveals that the tracks of the 100 greatest artists consistently outperform those of their counterparts in terms of popularity. This difference is especially notable from the 1950s to the 1960s, indicating that the 100 greatest artists’ older tracks remain highly popular at the end of 2023.
+
+### [Audio features](https://developer.spotify.com/documentation/web-api/reference/get-audio-features) of the 100 greatest artists
+
+The following plots comparing the audio features and popularity of tracks from the 100 greatest artists.
+
+```{r,echo= FALSE}
+# Comparing danceability and popularity of tracks
+ggplot(data = all_info_100, aes(x = cut(danceability, breaks = seq(0,1,0.1), 
+                                            include.lowest = TRUE),
+                                    y = track_popularity)) +
+  stat_summary(fun.y = mean, geom = "bar", fill = "#fcceca") + 
+  labs(title = "Comparing Danceability and Popularity of Greatest Tracks",
+       x = "Danceability",
+       y = "Popularity") +
+  theme_minimal() +
+  theme(legend.title=element_blank()) +
+  theme(plot.title = element_text(hjust = 0.5, size = 18),
+        plot.subtitle = element_text(hjust = 0.5))
+
+```
+
+The plot reveals that those with higher danceability, ranging from 0.8 to 1, exhibit greater popularity. While tracks with intermediate danceability (0.1 to 0.8) demonstrate similar levels of popularity, those with lower danceability (0 to 0.1) tend to be less popular.
+
+```{r,echo= FALSE}
+# Comparing energy and popularity of tracks
+ggplot(data = all_info_100, aes(x = cut(energy, breaks = seq(0,1,0.1), 
+                                            include.lowest = TRUE),
+                                    y = track_popularity)) +
+  stat_summary(fun.y = mean, geom = "bar", fill = "#fbc6c1") +  
+  labs(title = "Comparing Energy and Popularity of Tracks",
+       x = "Energy",
+       y = "Popularity") +
+  theme_minimal() +
+  theme(legend.title=element_blank()) +
+  theme(plot.title = element_text(hjust = 0.5, size = 18),
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+```
+
+The plot indicates a trend where tracks with higher energy levels are more popular.
+
+```{r,echo= FALSE}
+# Comparing speechiness and popularity of tracks
+ggplot(data = all_info_100, aes(x = cut(speechiness, breaks = seq(0,1,0.1), 
+                                            include.lowest = TRUE),
+                                    y = track_popularity)) +
+  stat_summary(fun.y = mean, geom = "bar", fill = "#fab7b2") +  
+  labs(title = "Comparing Speechiness and Popularity of Tracks",
+       x = "Speechiness",
+       y = "Popularity") +
+  theme_minimal() +
+  theme(legend.title=element_blank()) +
+  theme(plot.title = element_text(hjust = 0.5, size = 18),
+        plot.subtitle = element_text(hjust = 0.5))
+
+```
+
+
+The plot shows that tracks with higher speechiness, from 0.5 to 1, are less popular. Tracks contain both music and speech, with speechiness between 0.2 to 0.4 are more popular.  
+
+
+```{r,echo= FALSE}
+# Comparing acousticness and popularity of tracks
+ggplot(data = all_info_100, aes(x = cut(acousticness, breaks = seq(0,1,0.1), 
+                                            include.lowest = TRUE),
+                                    y = track_popularity)) +
+  stat_summary(fun.y = mean, geom = "bar", fill = "#f9a19a") +  
+  labs(title = "Comparing Acousticness and Popularity of Tracks",
+       x = "Acousticness",
+       y = "Popularity") +
+  theme_minimal() +
+  theme(legend.title=element_blank()) +
+  theme(plot.title = element_text(hjust = 0.5, size = 18),
+        plot.subtitle = element_text(hjust = 0.5))
+
+```
+
+The plot indicates that higher acoustic confidence is associated with lower popularity, suggesting less popularity for acoustic tracks.
+
+
+```{r,echo= FALSE}
+# Comparing market number and popularity of tracks
+ggplot(data = all_info_100 %>%
+         mutate(market_num = str_count(available_markets, ",") + 1) , 
+       aes(x = cut(market_num, breaks = seq(0,210,40),include.lowest = TRUE),
+           y = track_popularity)) +
+  stat_summary(fun.y = mean, geom = "bar", fill = "#f88b82") +  
+  labs(title = "Comparing Market Number and Popularity of Tracks",
+       x = "Available Market Number",
+       y = "Popularity") +
+  theme_minimal() +
+  theme(legend.title=element_blank()) +
+  theme(plot.title = element_text(hjust = 0.5, size = 18),
+        plot.subtitle = element_text(hjust = 0.5))
+
+```
+
+The plot unveils a positive correlation between the number of markets a track is available in and its popularity.
+
+
+
+
+### Text analysis
+
+```{r, eval=FALSE, echo= FALSE}
+# Create a dfm
+
+all_info_100_lyrics_1 <- all_info_100_lyrics %>%
+  filter(lyric != "",
+         lyric != "character(0)",
+         nchar(lyric) > 300,) 
+
+stopwords <- stopwords("en") %>%
+  str_replace_all("[[:punct:]]", "") %>%
+  c("yeah","oh","ooh")
+
+get_dfm <- function(text) {
+  text <- tolower(text)
+  text <- str_replace_all(text, "[[:punct:]]", "")
+  tokens <- tokens(text, remove_punct = TRUE, remove_numbers = TRUE)
+  tokens <- tokens_remove(tokens, pattern = stopwords)
+  dfm <- dfm(tokens)
+  return(dfm)
+}
+
+all_info_100_lyrics_1$dfm <- ""
+all_info_100_lyrics_1$top_words <- ""
+
+for (i in 1:nrow(all_info_100_lyrics_1)) {
+  dfm <- get_dfm(all_info_100_lyrics_1$lyric[i])
+  all_info_100_lyrics_1$dfm[i] <- list(dfm)
+  top_words <- list(names(tail(sort(colSums(dfm)), 3)))
+  all_info_100_lyrics_1$top_words[i] <- top_words
+  
+}
+
+lyrics_dfm <- all_info_100_lyrics_1 %>%
+  left_join(all_info_100%>%
+              select(20,41))
+
+
+saveRDS(lyrics_dfm, file = "lyrics_dfm.RData")
+
+```
+
+```{r}
+
+lyrics_dfm <- readRDS("lyrics_dfm.RData")
+
+
+lyrics_top_n <- lyrics_dfm %>%
+  tidyr::unnest(cols = c(top_words)) %>%
+  group_by(top_words) %>%
+  mutate(top_words_n = n(),
+         popularity_word = mean(track_popularity)) %>%
+  ungroup() %>%
+  select(7,9,10) %>%
+  unique() %>%
+  # Exclude words that appear in less than 10 songs
+  # to avoid words that are too specific
+  filter(top_words_n > 10) %>%
+  # Select top 20 words with highest popularity
+  top_n(20, popularity_word) 
+
+```
+
+
+```{r,echo=FALSE}
+
+# Draw a plot of words with highest average song popularity
+lyrics_top_n %>%
+  ggplot(aes(x = top_words_n, y = popularity_word, label = top_words)) +
+  geom_text_repel(color= '#f78b82', fontface = "bold") +
+  labs(x = "Number of Songs", y = "Average Popularity of Songs Containing the Word", title = "Top 20 Words with Highest Average Song Popularity") +
+  theme_minimal() +
+  theme(legend.title=element_blank()) +
+  theme(plot.title = element_text(hjust = 0.5, size = 18),
+        plot.subtitle = element_text(hjust = 0.5))
+
+```
+
+The study identifies the top three most frequently used words in each song and calculates the average popularity of songs containing the same frequently used words. The plot demonstrates the top 20 words with the highest average popularity in songs containing those words.
+
+The presence of “Christmas” and “Santa” on the plot indicates that Christmas songs are associated with high popularity. Specifically, songs featuring “Santa” among the top three words exhibit notably high average popularity, and "Christmas" is the most frequently used word among them. Furthermore, other words on the plot are commonly found in rap songs, suggesting the potential for high popularity in this genre.
+
+```{r, eval=FALSE, echo= FALSE}
+# Sentiment analysis
+lyrics_dfm <- readRDS("lyrics_dfm.RData")
+data_dictionary_LSD2015_pos_neg <- data_dictionary_LSD2015[1:2]
+
+lyrics_sentiment <- lyrics_dfm %>%
+  rowwise() %>%
+  mutate(sentiment = list(dfm_lookup(dfm,  dictionary = data_dictionary_LSD2015_pos_neg)),
+         positive = replace(sentiment["text1","positive"]@x, length(sentiment["text1","positive"]@x) ==0, 0),
+         negative = replace(sentiment["text1","negative"]@x, length(sentiment["text1","negative"]@x) ==0, 0),
+         sentiment_score = positive / (positive + negative) )
+
+saveRDS(lyrics_sentiment, file = "lyrics_sentiment.RData")
+
+```
+
+```{r, echo= FALSE}
+
+lyrics_sentiment <- readRDS("lyrics_sentiment.RData") %>%
+  select(-artist_name_check)
+```
+
+```{r, echo= TRUE}
+glimpse(lyrics_sentiment)
+```
+
+Sentiment analysis is conducted using the Lexicoder Sentiment Dictionary (Young and Soroka, 2012), which includes 1709 positive words and 2858 negative words. Each song's sentiment score is derived by dividing the count of positive words by the sum of positive and negative words. This sentiment score ranges from 0 to 1, where scores approaching 0 are more negative, and scores approaching 1 are more positive.
+
+```{r,echo= FALSE}
+# Comparing sentiment score and Popularity of Tracks
+outlier_5 <- quantile(lyrics_sentiment$negative,  probs = 0.05,na.rm = TRUE)
+outlier_95 <- quantile(lyrics_sentiment$negative,  probs = 0.95,na.rm = TRUE)
+
+lyrics_sentiment %>%
+  filter(negative > outlier_5,
+         negative <outlier_95)%>%
+  ggplot(aes(x = cut(negative,breaks =  seq(0,30,2), 
+                     include.lowest = TRUE),
+             y = track_popularity)) +
+  stat_summary(fun.y = mean, geom = "bar",  fill = "#f6867c") +
+  labs(title = "Comparing Number of Negative Words and Popularity",
+       x = "Number of Negative Words",
+       y = "Popularity") +
+  theme_minimal() +
+  theme(legend.title=element_blank()) +
+  theme(plot.title = element_text(hjust = 0.5, size = 18),
+        plot.subtitle = element_text(hjust = 0.5))
+
+```
+
+The plot illustrates a clear correlation between the number of negative words in the lyrics and the popularity of songs. Interestingly, the more negative words present in the lyrics, the higher the popularity of the song.
+
+```{r,echo= FALSE}
+# Comparing sentiment score and Popularity of Tracks
+outlier_5 <- quantile(lyrics_sentiment$sentiment_score,  probs = 0.05,na.rm = TRUE)
+outlier_95 <- quantile(lyrics_sentiment$sentiment_score,  probs = 0.95,na.rm = TRUE)
+
+lyrics_sentiment %>%
+  filter(sentiment_score > outlier_5,
+         sentiment_score <outlier_95)%>%
+  ggplot(aes(x = cut(sentiment_score,breaks =  seq(0,1,0.2), 
+                     include.lowest = TRUE),
+             y = track_popularity)) +
+  stat_summary(fun.y = mean, geom = "bar",  fill = "#f5756a") +
+  labs(title = "Comparing sentiment score and Popularity of Tracks ",
+       x = "Sentiment Score",
+       y = "Popularity") +
+  theme_minimal() +
+  theme(legend.title=element_blank()) +
+  theme(plot.title = element_text(hjust = 0.5, size = 18),
+        plot.subtitle = element_text(hjust = 0.5))
+```
+
+The plot reveals a distinct negative correlation between the sentiment score and the popularity of songs. Songs with lower sentiment scores in their lyrics tend to be more popular.
+
+## Conclusion
+In the exploration of Rolling Stone's 100 Greatest Musical Artists of 2010, this study reveils the timeless appeal and unveils the underlying secrets behind their acclaimed tracks. By leveraging Spotify and Genius APIs, it is discerned that the 100 greatest artists consistently outshine their counterparts, boasting higher popularity and followers. Notably, there is sustained popularity for tracks from the 1950s to the 1960s. Audio features analysis identifies positive correlations with higher danceability, energy levels, and tracks blending music and speech. Moreover, availability in diverse markets positively influences song popularity. Text analysis uncovers the significant popularity of Christmas-themed songs and an inclination towards negative lyrics, potentially associated with rap music. 
+
+## References
+
+Genius API documentation. Genius API. (n.d.). https://docs.genius.com/#/getting-started-h1 
+
+Rolling Stone. (2023, July 3). 100 greatest artists. https://www.rollingstone.com/music/music-lists/100-greatest-artists-147446/ 
+
+Spotify Web API . Web API | Spotify for Developers. (n.d.). https://developer.spotify.com/documentation/web-api 
+
+Young, L., & Soroka, S. (2012). Affective news: The automated coding of sentiment in political texts. Political Communication, 29(2), 205–231. https://doi.org/10.1080/10584609.2012.671234 
+
+
+## Appendix: All code in this assignment
+```{r,warning=FALSE,message=FALSE,echo=TRUE,results=FALSE, fig.keep = "none", eval = FALSE}
+
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+options(Encoding="UTF-8")
+options(scipen = 999)
+
+# Set working directory
+setwd("G:/我的雲端硬碟/lse/Course Materials/MY472/practice/assignments/Final")
+# Required packages in this exercise
+library(tidyverse)
+library(rvest)
+library(spotifyr)
+library(geniusr)
+library(rvest)
+library(xml2)
+library(ggplot2)
+library(lubridate)
+library(ggpubr)
+library(ggrepel)
+library(quanteda)
+
+# # Perform web-scraping to get a list of Rolling Stone’s 100 Greatest Artists
+# Sys.setlocale("LC_ALL","English")
+# 
+# url_100_50 <- "https://www.rollingstone.com/music/music-lists/100-greatest-artists-147446/"
+# artists_100_50 <- read_html(url_100_50) %>%
+#   html_elements( css = 'h2') %>% 
+#   html_text() %>%
+#   head(50)
+# 
+# url_50_1 <- "https://www.rollingstone.com/music/music-lists/100-greatest-artists-147446/the-band-2-88489/"
+# 
+# artists_50_1 <- read_html(url_50_1) %>%
+#   html_elements( css = 'h2') %>% 
+#   html_text() %>%
+#   head(50)
+# 
+# artists <- rev(c(artists_100_50, artists_50_1))
+# 
+# write_rds(artists, "artists.rds")
+
+# # Get audio feature information for all the artists
+# readRenviron("api_keys.Renviron")
+# SPOTIFY_CLIENT_ID <- Sys.getenv("SPOTIFY_CLIENT_ID")
+# SPOTIFY_CLIENT_SECRET <- Sys.getenv("SPOTIFY_CLIENT_SECRET")
+# access_token <- get_spotify_access_token()
+# 
+# audio_info <- data.frame(matrix(ncol = 0, nrow = 0), stringsAsFactors = FALSE)
+# 
+# for (artist in artists) {
+#   tryCatch({
+#     audio_artist <- get_artist_audio_features(artist)
+#     audio_info <- rbind(audio_info, audio_artist)
+#   }, error = function(e) {
+#     # No albums found with some artist_id
+#     # Print the name of the artist and the error message
+#     cat("Error for artist:", artist, "\n")
+#     cat("Error message:", conditionMessage(e), "\n")
+#   })
+# }
+# 
+# # Save the data
+# write.csv(audio_info, "audio_info.csv", row.names = FALSE, fileEncoding = "UTF-8")
+
+# artists_id <- unique(audio_info$artist_id)
+# 
+# # Get popularity of 100 greatest artists
+# artists_1 <- get_artists(artists_id[1:50])
+# artists_2 <- get_artists(artists_id[51:98])
+# artists_info <- rbind(artists_1, artists_2)
+# 
+# artists_info[,c(1,3,4) ] <- lapply(artists_info[, c(1,3,4)], as.character)
+# write.csv(artists_info, "artists_info.csv", row.names = FALSE, fileEncoding = "UTF-8")
+
+# # Get popularity of every album
+# album_ids <- unique(audio_info$album_id)
+# album_num <- length(album_ids)
+# 
+# album_info <- data.frame(matrix(ncol = 0, nrow = 0), stringsAsFactors = FALSE)
+# 
+# # Request data of 20 albums every time because of
+# # the limit of get_albums function
+# for (i in seq(1, album_num, by = 20)) {
+#   end <- min(i + 19, album_num)
+#   album_info_element <- get_albums(album_ids[i:end])
+#   album_info<-rbind(album_info,album_info_element)
+# }
+# 
+# # Save the data
+# album_info[, c(2, 3, 4, 5, 8, 20)] <- lapply(album_info[, c(2, 3, 4, 5, 8, 20)], as.character)
+# write.csv(album_info, "album_info.csv", row.names = FALSE, fileEncoding = "UTF-8")
+
+# # Get the popularity of every track
+# track_ids <- unique(audio_info$track_id)
+# track_num <- length(track_ids)
+# test <- get_tracks(track_ids)
+# 
+# track_info <- data.frame(matrix(ncol = 0, nrow = 0), stringsAsFactors = FALSE)
+# 
+# # Request 50 tracks every request to fulfil the limit of the API
+# for (i in seq(1, track_num, by = 50)) {
+#   end <- min(i + 49, track_num)
+#   track_info_element <- get_tracks(track_ids[i:end])
+#   track_info<-rbind(track_info, track_info_element)
+# }
+# 
+# track_info[, c(1, 2, 16, 17, 20)] <- lapply(track_info[, c(1, 2, 16, 17, 20)], as.character)
+# write.csv(track_info, "track_info.csv", row.names = FALSE, fileEncoding = "UTF-8")
+
+# album_info_popu <- album_info %>%
+#   select(id, popularity) %>%
+#   rename(album_popularity = popularity)
+# 
+# track_info_popu <- track_info %>%
+#   select(id, popularity)%>%
+#   rename(track_popularity = popularity)
+# 
+# artists_info <- artists_info %>%
+#   select(1,3,6,11)%>%
+#   rename(artist_genre = genres, artist_id = id, artist_popularity = popularity, artist_followers = followers.total)
+# 
+# 
+# # Combine all data
+# all_info_100 <- audio_info %>%
+#   left_join(album_info_popu, by = c("album_id" = "id")) %>%
+#   left_join(track_info_popu, by = c("track_id" = "id")) %>%
+#   left_join(artists_info, by = c("artist_id" = "artist_id")) %>%
+#   mutate(album_release_date = as.Date(album_release_date))
+# 
+# write.csv(all_info_100, "all_info_100.csv", row.names = FALSE, fileEncoding = "UTF-8")
+
+# # Get related artists for the 100 greatest artists
+# related_artists <- data.frame(matrix(ncol = 0, nrow = 0), stringsAsFactors = FALSE)
+# for (id in artists_id){
+#   related_artists_element <- get_related_artists(id)
+#   related_artists<-rbind(related_artists, related_artists_element)
+# }
+# related_artists[,c(1,3,4) ] <- lapply(related_artists[, c(1,3,4)], as.character)
+# write.csv(related_artists, "related_artists.csv", row.names = FALSE, fileEncoding = "UTF-8")
+# 
+# # Filter out the artists that are in the 100 greatest artists
+# related_artists_unique <- unique(related_artists) %>%
+#   filter(! id %in% unique(all_info_100$artist_id)) %>%
+#   select(1,3,6,11)%>%
+#   rename(artist_genre = genres, artist_id = id, artist_popularity = popularity, artist_followers = followers.total)
+
+# # Get audio feature information for related artists
+# related_audio_info <- data.frame(matrix(ncol = 0, nrow = 0), stringsAsFactors = FALSE)
+# 
+# for (artist in related_artists_unique$id) {
+#   tryCatch({
+#     related_audio_info_element <- get_artist_audio_features(artist)
+#     related_audio_info <- rbind(related_audio_info, related_audio_info_element)
+#   }, error = function(e) {
+#     # There are no albums found with some artist_id
+#     # Print the name of the artist and the error message
+#     cat("Error for artist:", artist, "\n")
+#     cat("Error message:", conditionMessage(e), "\n")
+#   })
+# }
+# 
+# related_audio_info[, c (4, 5, 23, 24)] <- lapply(related_audio_info[, c(4, 5, 23, 24 )], as.character)
+# write.csv(related_audio_info, "related_audio_info.csv", row.names = FALSE, fileEncoding = "UTF-8")
+
+# # Get popularity of related artists albums
+# related_album_ids <- unique(related_audio_info$album_id)
+# related_album_num <- length(related_album_ids)
+# related_album_info <- data.frame(matrix(ncol = 0, nrow = 0), stringsAsFactors = FALSE)
+# 
+# # Request 20 albums every time because of
+# # the limit of get_albums function
+# for (i in seq(1, related_album_num, by = 20)) {
+#   end <- min(i + 19, related_album_num)
+#   related_album_info_element <- get_albums(related_album_ids[i:end])
+#   related_album_info<-rbind(related_album_info,related_album_info_element)
+# }
+# 
+# # Save the data
+# related_album_info[, c(2, 3, 4, 5, 8, 20)] <- lapply(related_album_info[, c(2, 3, 4, 5, 8, 20)], as.character)
+# write.csv(related_album_info, "related_album_info.csv", row.names = FALSE, fileEncoding = "UTF-8")
+
+# # Get popularity of related artists tracks
+# related_track_ids <- unique(related_audio_info$track_id)
+# related_track_num <- length(related_track_ids)
+# 
+# related_track_info <- data.frame(matrix(ncol = 0, nrow = 0), stringsAsFactors = FALSE)
+# # Request 50 tracks every request to save memory and fulfil the limit of the API
+# for (i in seq(35600, related_track_num, by = 50)) {
+#   end <- min(i + 49, related_track_num)
+#   related_track_info_element <- get_tracks(related_track_ids[i:end])
+#   related_track_info <- rbind(related_track_info, related_track_info_element)
+# }
+# 
+# related_track_info[, c(1, 2, 16, 17, 20)] <- lapply(related_track_info[, c(1, 2, 16, 17, 20)], as.character)
+# write.csv(related_track_info, "related_track_info.csv", row.names = FALSE, fileEncoding = "UTF-8")
+
+# related_album_info_popu <- related_album_info %>%
+#   select(id, popularity)%>%
+#   rename(album_popularity = popularity)
+# 
+# related_track_info_popu <- related_track_info %>%
+#   select(id, popularity)%>%
+#   rename(track_popularity = popularity)
+# 
+# 
+# all_info_related <- related_audio_info %>%
+#   left_join(related_album_info_popu, by = c("album_id" = "id")) %>%
+#   left_join(related_track_info_popu, by = c("track_id" = "id")) %>%
+#   left_join(related_artists_unique, by = c("artist_id" = "artist_id")) %>%
+#   mutate(album_release_date = as.Date(album_release_date))
+# 
+# write.csv(all_info_related, "all_info_related.csv", row.names = FALSE, fileEncoding = "UTF-8")
+
+all_info_100 <- read.csv("all_info_100.csv")
+all_info_related <- read.csv("all_info_related.csv")
+
+glimpse(all_info_100)
+dim(all_info_related)
+
+# Fix issues of geniusr package
+get_lyrics <- function (session) {
+  lyrics <-  session %>% html_nodes(xpath = '//div[contains(@class, "Lyrics__Container")]')
+  song <-  session %>% html_nodes(xpath = '//span[contains(@class, "SongHeaderdesktop__")]') %>% html_text(trim = TRUE) 
+  artist <-  session %>% html_nodes(xpath = '//a[contains(@class, "SongHeaderdesktop__Artist")]') %>% html_text(trim = TRUE)
+  
+  xml_find_all(lyrics, ".//br") %>% xml_add_sibling("p", "\n")
+  xml_find_all(lyrics, ".//br") %>% xml_remove()
+  lyrics <- html_text(lyrics, trim = TRUE)
+  lyrics <- unlist(strsplit(lyrics, split = "\n"))
+  lyrics <- grep(pattern = "[[:alnum:]]", lyrics, value = TRUE)
+  if (is_empty(lyrics)) {
+    return(tibble(line = NA, section_name = NA, section_artist = NA, 
+                  song_name = song, artist_name = artist))
+  }
+  section_tags <- nchar(gsub(pattern = "\\[.*\\]", "", lyrics)) == 0
+  sections <- geniusr:::repeat_before(lyrics, section_tags)
+  sections <- gsub("\\[|\\]", "", sections)
+  sections <- strsplit(sections, split = ": ", fixed = TRUE)
+  section_name <- sapply(sections, "[", 1)
+  section_artist <- sapply(sections, "[", 2)
+  tibble(line = lyrics[!section_tags], section_name = section_name[!section_tags], 
+         artist = section_artist[!section_tags], song_name = song)
+}
+
+assignInNamespace("get_lyrics", get_lyrics, "geniusr")
+
+# # Get lyrics of 100 greatest singers' songs
+# all_info_100_lyrics <- all_info_100 %>%
+#   select(track_id, track_name, artist_name) 
+# all_info_100_lyrics$lyric <- ""
+# all_info_100_lyrics$artist_name_check <- ""
+# 
+# for (i in 1:nrow(all_info_100_lyrics)) {
+#   track <- all_info_100_lyrics$track_name[i]
+#   artist <- all_info_100_lyrics$artist_name[i]
+#   tryCatch({
+#   result <- get_lyrics_search(artist, track)
+#   all_info_100_lyrics$lyric[i] <- result %>%
+#     mutate(lyric = paste(line, collapse = " ")) %>%
+#     select(lyric) %>%
+#     unique()
+#   all_info_100_lyrics$artist_name_check[i] <- result$artist[1]
+#   if (i %% 100 == 0) {
+#     print(i)
+#   }
+#   }, error = function(e) {
+#     # Print the name of track, the artist and the error message
+#     # cat("Error for artist and track:", artist, track,"\n")
+#     # cat("Error message:", conditionMessage(e), "\n")
+#   })
+# }
+# 
+# all_info_100_lyrics.csv$lyric <- as.character(all_info_100_lyrics.csv$lyric)
+# 
+# write.csv(all_info_100_lyrics, "all_info_100_lyrics.csv", row.names = FALSE, fileEncoding = "UTF-8")
+
+all_info_100_lyrics <- read.csv("all_info_100_lyrics.csv", fileEncoding = "UTF-8") %>%
+  select(1:4)
+
+glimpse(all_info_100_lyrics)
+
+all_info_100 <- all_info_100 %>%
+  mutate(artist_type = "Greatest 100") 
+
+all_info_related <- all_info_related %>%
+  mutate(artist_type = "Related artists")
+
+all_info_compare <- rbind(all_info_100, all_info_related)
+
+artists_compare <- all_info_compare %>%
+  group_by(artist_type) %>%
+  # Remove outliers to better visualize the data
+  filter(artist_followers > quantile(artist_followers, 0.1),
+         artist_followers < quantile(artist_followers, 0.9),
+         artist_popularity > quantile(artist_popularity, 0.1),
+         artist_popularity < quantile(artist_popularity, 0.9))
+
+# Create the dot plot
+ggplot(artists_compare, aes(x = artist_followers, y = artist_popularity, color = artist_type, fill = artist_type)) +
+  geom_point() +
+  stat_chull(aes(color = artist_type, fill = artist_type), 
+             alpha = 0.1, geom = "polygon") +
+  labs(title = "Comparing the Number of Follower and Popularity",
+       subtitle = "Rolling Stone’s 100 Greatest Artists vs Related Artists",
+       x = "Follower",
+       y = "Popularity",
+       color = "Type",
+       fill = "Type") +
+  theme_minimal() +
+  theme(legend.title=element_blank()) +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+# Comparing the popularity of tracks by release date of artists
+all_info_compare %>% 
+  select(track_id, album_release_year, track_popularity, artist_type) %>%
+  unique() %>%
+  filter( album_release_year >1950,
+          !is.na(track_popularity)) %>%
+  group_by(artist_type) %>%
+  filter(track_popularity > quantile(track_popularity, 0.1),
+         track_popularity < quantile(track_popularity, 0.9)) %>%
+  ggplot(aes(x = album_release_year, y = track_popularity, color = artist_type, fill = artist_type)) +
+  stat_summary(fun.y = mean, geom = "line", size = 1) +
+  labs(title = "Comparing Popularity of Tracks by Release Date",
+       subtitle = "Rolling Stone’s 100 Greatest Artists vs Related Artists",
+       x = "Year",
+       y = "Popularity",
+       color = "Type",
+       fill = "Type") +
+  theme_minimal() +
+  theme(legend.title=element_blank()) +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+
+# Comparing danceability and popularity of tracks
+ggplot(data = all_info_100, aes(x = cut(danceability, breaks = seq(0,1,0.1), 
+                                            include.lowest = TRUE),
+                                    y = track_popularity)) +
+  stat_summary(fun.y = mean, geom = "bar", fill = "#fcceca") + 
+  labs(title = "Comparing Danceability and Popularity of Greatest Tracks",
+       x = "Danceability",
+       y = "Popularity") +
+  theme_minimal() +
+  theme(legend.title=element_blank()) +
+  theme(plot.title = element_text(hjust = 0.5, size = 18),
+        plot.subtitle = element_text(hjust = 0.5))
+
+# Comparing energy and popularity of tracks
+ggplot(data = all_info_100, aes(x = cut(energy, breaks = seq(0,1,0.1), 
+                                            include.lowest = TRUE),
+                                    y = track_popularity)) +
+  stat_summary(fun.y = mean, geom = "bar", fill = "#fbc6c1") +  
+  labs(title = "Comparing Energy and Popularity of Tracks",
+       x = "Energy",
+       y = "Popularity") +
+  theme_minimal() +
+  theme(legend.title=element_blank()) +
+  theme(plot.title = element_text(hjust = 0.5, size = 18),
+        plot.subtitle = element_text(hjust = 0.5))
+
+# Comparing speechiness and popularity of tracks
+ggplot(data = all_info_100, aes(x = cut(speechiness, breaks = seq(0,1,0.1), 
+                                            include.lowest = TRUE),
+                                    y = track_popularity)) +
+  stat_summary(fun.y = mean, geom = "bar", fill = "#fab7b2") +  
+  labs(title = "Comparing Speechiness and Popularity of Tracks",
+       x = "Speechiness",
+       y = "Popularity") +
+  theme_minimal() +
+  theme(legend.title=element_blank()) +
+  theme(plot.title = element_text(hjust = 0.5, size = 18),
+        plot.subtitle = element_text(hjust = 0.5))
+
+# Comparing acousticness and popularity of tracks
+ggplot(data = all_info_100, aes(x = cut(acousticness, breaks = seq(0,1,0.1), 
+                                            include.lowest = TRUE),
+                                    y = track_popularity)) +
+  stat_summary(fun.y = mean, geom = "bar", fill = "#f9a19a") +  
+  labs(title = "Comparing Acousticness and Popularity of Tracks",
+       x = "Acousticness",
+       y = "Popularity") +
+  theme_minimal() +
+  theme(legend.title=element_blank()) +
+  theme(plot.title = element_text(hjust = 0.5, size = 18),
+        plot.subtitle = element_text(hjust = 0.5))
+
+# Comparing market number and popularity of tracks
+ggplot(data = all_info_100 %>%
+         mutate(market_num = str_count(available_markets, ",") + 1) , 
+       aes(x = cut(market_num, breaks = seq(0,210,40),include.lowest = TRUE),
+           y = track_popularity)) +
+  stat_summary(fun.y = mean, geom = "bar", fill = "#f88b82") +  
+  labs(title = "Comparing Market Number and Popularity of Tracks",
+       x = "Available Market Number",
+       y = "Popularity") +
+  theme_minimal() +
+  theme(legend.title=element_blank()) +
+  theme(plot.title = element_text(hjust = 0.5, size = 18),
+        plot.subtitle = element_text(hjust = 0.5))
+
+# Create a dfm
+all_info_100_lyrics_1 <- all_info_100_lyrics %>%
+  filter(lyric != "",
+         lyric != "character(0)",
+         nchar(lyric) > 300,) 
+
+stopwords <- stopwords("en") %>%
+  str_replace_all("[[:punct:]]", "") %>%
+  c("yeah","oh","ooh")
+
+get_dfm <- function(text) {
+  text <- tolower(text)
+  text <- str_replace_all(text, "[[:punct:]]", "")
+  tokens <- tokens(text, remove_punct = TRUE, remove_numbers = TRUE)
+  tokens <- tokens_remove(tokens, pattern = stopwords)
+  dfm <- dfm(tokens)
+  return(dfm)
+}
+
+all_info_100_lyrics_1$dfm <- ""
+all_info_100_lyrics_1$top_words <- ""
+
+for (i in 1:nrow(all_info_100_lyrics_1)) {
+  dfm <- get_dfm(all_info_100_lyrics_1$lyric[i])
+  all_info_100_lyrics_1$dfm[i] <- list(dfm)
+  top_words <- list(names(tail(sort(colSums(dfm)), 3)))
+  all_info_100_lyrics_1$top_words[i] <- top_words
+  
+}
+
+lyrics_dfm <- all_info_100_lyrics_1 %>%
+  left_join(all_info_100%>%
+              select(20,41))
+
+
+saveRDS(lyrics_dfm, file = "lyrics_dfm.RData")
+
+lyrics_dfm <- readRDS("lyrics_dfm.RData")
+
+lyrics_top_n <- lyrics_dfm %>%
+  tidyr::unnest(cols = c(top_words)) %>%
+  group_by(top_words) %>%
+  mutate(top_words_n = n(),
+         popularity_word = mean(track_popularity)) %>%
+  ungroup() %>%
+  select(7,9,10) %>%
+  unique() %>%
+  # Exclude words that appear in less than 10 songs
+  # to avoid words that are too specific
+  filter(top_words_n > 10) %>%
+  # Select top 20 words with highest popularity
+  top_n(20, popularity_word) 
+
+# Draw a plot of words with highest average song popularity
+lyrics_top_n %>%
+  ggplot(aes(x = top_words_n, y = popularity_word, label = top_words)) +
+  geom_text_repel(color= '#f78b82', fontface = "bold") +
+  labs(x = "Number of Songs", y = "Average Popularity of Songs Containing the Word", title = "Top 20 Words with Highest Average Song Popularity") +
+  theme_minimal() +
+  theme(legend.title=element_blank()) +
+  theme(plot.title = element_text(hjust = 0.5, size = 18),
+        plot.subtitle = element_text(hjust = 0.5))
+
+# Sentiment analysis
+lyrics_dfm <- readRDS("lyrics_dfm.RData")
+data_dictionary_LSD2015_pos_neg <- data_dictionary_LSD2015[1:2]
+
+lyrics_sentiment <- lyrics_dfm %>%
+  rowwise() %>%
+  mutate(sentiment = list(dfm_lookup(dfm,  dictionary = data_dictionary_LSD2015_pos_neg)),
+         positive = replace(sentiment["text1","positive"]@x, length(sentiment["text1","positive"]@x) ==0, 0),
+         negative = replace(sentiment["text1","negative"]@x, length(sentiment["text1","negative"]@x) ==0, 0),
+         sentiment_score = positive / (positive + negative) )
+
+saveRDS(lyrics_sentiment, file = "lyrics_sentiment.RData")
+
+lyrics_sentiment <- readRDS("lyrics_sentiment.RData") %>%
+  select(-artist_name_check)
+
+glimpse(lyrics_sentiment)
+
+# Comparing sentiment score and Popularity of Tracks
+outlier_5 <- quantile(lyrics_sentiment$negative,  probs = 0.05,na.rm = TRUE)
+outlier_95 <- quantile(lyrics_sentiment$negative,  probs = 0.95,na.rm = TRUE)
+
+lyrics_sentiment %>%
+  filter(negative > outlier_5,
+         negative <outlier_95)%>%
+  ggplot(aes(x = cut(negative,breaks =  seq(0,30,2), 
+                     include.lowest = TRUE),
+             y = track_popularity)) +
+  stat_summary(fun.y = mean, geom = "bar",  fill = "#f6867c") +
+  labs(title = "Comparing Number of Negative Words and Popularity",
+       x = "Number of Negative Words",
+       y = "Popularity") +
+  theme_minimal() +
+  theme(legend.title=element_blank()) +
+  theme(plot.title = element_text(hjust = 0.5, size = 18),
+        plot.subtitle = element_text(hjust = 0.5))
+
+# Comparing sentiment score and Popularity of Tracks
+outlier_5 <- quantile(lyrics_sentiment$sentiment_score,  probs = 0.05,na.rm = TRUE)
+outlier_95 <- quantile(lyrics_sentiment$sentiment_score,  probs = 0.95,na.rm = TRUE)
+
+lyrics_sentiment %>%
+  filter(sentiment_score > outlier_5,
+         sentiment_score <outlier_95)%>%
+  ggplot(aes(x = cut(sentiment_score,breaks =  seq(0,1,0.2), 
+                     include.lowest = TRUE),
+             y = track_popularity)) +
+  stat_summary(fun.y = mean, geom = "bar",  fill = "#f5756a") +
+  labs(title = "Comparing sentiment score and Popularity of Tracks ",
+       x = "Sentiment Score",
+       y = "Popularity") +
+  theme_minimal() +
+  theme(legend.title=element_blank()) +
+  theme(plot.title = element_text(hjust = 0.5, size = 18),
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+```
+
